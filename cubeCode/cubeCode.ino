@@ -1,61 +1,78 @@
 
-const char* ssid = "xxxxx";
-const char* wifiPassword = "xxxxx";
-const char* mqttServer = "xxxxx";
-const char* mqttUsername = "xxxxx";
-const char* mqttPassword = "xxxxx";
-const char* mqttPublishTopic = "blinky-mqtt-led/XX/reading";
-const char* mqttSubscribeTopic = "blinky-mqtt-led/XX/setting";
+const char* ssid = "Tele2_2BA356";
+const char* wifiPassword = "";
+const char* mqttServer = "hip-lifeguard.cloudmqtt.com";
+const char* mqttUsername = "";
+const char* mqttPassword = "";
+const char* mqttPublishTopic = "blinky-hpTempBypass/01/reading";
+const char* mqttSubscribeTopic = "blinky-hpTempBypass/01/setting";
 
 
-#define BLINKYMQTTBUSBUFSIZE  5
+#define BLINKYMQTTBUSBUFSIZE  3
 union BlinkyBusUnion
 {
   struct
   {
     int16_t state;
     int16_t watchdog;
-    int16_t led1;
-    int16_t led2;
-    int16_t led3;
+    int16_t relay;
   };
   int16_t buffer[BLINKYMQTTBUSBUFSIZE];
 } blinkyBus;
 void subscribeCallback(uint8_t address, int16_t value)
 {
-  if (address > 1) setLeds();
+  if (address == 2) setRelay();
 }
 
 #include "blinky-wifiMqtt-cube.h"
+int relayPin = 22;
+int wirelessConnectedPin = 10;
+int relayLedPin = 12;
+unsigned long tnow;
+unsigned long lastWirelessBlink;
+boolean wirelessLed = false;
 
-int led1Pin = 10;
-int led2Pin = 11;
-int led3Pin = 12;
 
 void setup() 
 {
-  pinMode(led1Pin, OUTPUT);
-  pinMode(led2Pin, OUTPUT);
-  pinMode(led3Pin, OUTPUT);
+  pinMode(relayPin, OUTPUT);
+  pinMode(wirelessConnectedPin, OUTPUT);
+  pinMode(relayLedPin, OUTPUT);
+  digitalWrite(wirelessConnectedPin, 1);
   Serial.begin(115200);
   delay(5000);
-  initBlinkyBus(2000,true, LED_BUILTIN);
+  initBlinkyBus(2000,true, 11);
 
-  blinkyBus.led1 = 0;
-  blinkyBus.led2 = 0;
-  blinkyBus.led3 = 0;
-  setLeds();
+  blinkyBus.relay = 0;
+  setRelay();
+  digitalWrite(wirelessConnectedPin, 0);
+  tnow = millis();
+  lastWirelessBlink = tnow;
 }
 
 void loop() 
 {
+  tnow = millis();
   blinkyBusLoop();
 //  publishBlinkyBusNow(); 
-}
+  if (g_wifiStatus == WL_CONNECTED)
+  {
+    wirelessLed = true;
+    digitalWrite(wirelessConnectedPin, wirelessLed);
+  }
+  else
+  {
+    if ((tnow - lastWirelessBlink) > 1000)
+    {
+      wirelessLed = !wirelessLed;
+      lastWirelessBlink = tnow;
+      digitalWrite(wirelessConnectedPin, wirelessLed);
+    }
+  }
 
-void setLeds()
+}
+void setRelay()
 {
-  digitalWrite(led1Pin, blinkyBus.led1);    
-  digitalWrite(led2Pin, blinkyBus.led2);    
-  digitalWrite(led3Pin, blinkyBus.led3);    
+  digitalWrite(relayPin, blinkyBus.relay);
+  digitalWrite(relayLedPin, blinkyBus.relay);
 }
